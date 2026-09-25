@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Asistencia y Hábitos - II Trimestre</title>
+  <!-- Librería SheetJS para exportar a formato Excel (.xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg-iphe: #d0ebff;
+      --bg-difa: #fff3bf;
+      --bg-esp: #ffdeeb;
+      --text-iphe: #1864ab;
+      --text-difa: #f59f00;
+      --text-esp: #c2255c;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f8f9fa;
+      margin: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1250px;
+      margin: 0 auto;
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    h1, h2 {
+      color: #1e3a8a;
+      margin-top: 0;
+    }
+
+    .header-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+      background: #f1f5f9;
+      padding: 15px;
+      border-radius: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    label {
+      font-weight: bold;
+      margin-bottom: 5px;
+      font-size: 0.85rem;
+      color: #475569;
+    }
+
+    input, select, textarea {
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font-size: 0.95rem;
+    }
+
+    .teacher-box {
+      background: #e2e8f0;
+      padding: 8px 12px;
+      border-radius: 5px;
+      font-weight: bold;
+      color: #1e293b;
+    }
+
+    /* Tabla de Estudiantes y Registros */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #0f172a;
+      color: white;
+      font-size: 0.85rem;
+    }
+
+    /* Badges de Programas Especiales */
+    .badge-iphe {
+      background-color: var(--bg-iphe);
+      color: var(--text-iphe);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+
+    .badge-difa {
+      background-color: var(--bg-difa);
+      color: var(--text-difa);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+
+    .badge-esp {
+      background-color: var(--bg-esp);
+      color: var(--text-esp);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 0.8rem;
+    }
+
+    /* Botones */
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+
+    .btn-primary { background-color: #2563eb; color: white; }
+    .btn-primary:hover { background-color: #1d4ed8; }
+
+    .btn-success { background-color: #16a34a; color: white; }
+    .btn-success:hover { background-color: #15803d; }
+
+    .btn-warning { background-color: #0284c7; color: white; }
+    .btn-warning:hover { background-color: #0369a1; }
+
+    .btn-secondary { background-color: #64748b; color: white; }
+    .btn-secondary:hover { background-color: #475569; }
+
+    .btn-danger { background-color: #dc2626; color: white; }
+    .btn-danger:hover { background-color: #b91c1c; }
+
+    .btn-sm { padding: 4px 8px; font-size: 0.8rem; margin-right: 2px; }
+
+    .actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    /* Estilo para la barra de búsqueda de historial */
+    .search-box-container {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: #e2e8f0;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    .search-box-container input {
+      flex: 1;
+      padding: 9px 12px;
+      font-size: 0.95rem;
+    }
+
+    /* Modal / Formulario Flotante */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 400px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>📋 Registro de Asistencia y Hábitos - II Trimestre</h1>
+
+  <!-- Encabezado de Selección -->
+  <div class="header-grid">
+    <div class="form-group">
+      <label>Fecha del Registro:</label>
+      <input type="date" id="fechaSelect" onchange="renderTabla()">
+    </div>
+    <div class="form-group">
+      <label>Trimestre:</label>
+      <select id="trimestreSelect">
+        <option value="II TRIMESTRE" selected>II TRIMESTRE</option>
+        <option value="I TRIMESTRE">I TRIMESTRE</option>
+        <option value="III TRIMESTRE">III TRIMESTRE</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Grupo / Sección:</label>
+      <select id="grupoSelect" onchange="cargarGrupo()">
+        <option value="3A">3A</option>
+        <option value="3B">3B</option>
+        <option value="3C">3C</option>
+        <option value="4A">4A</option>
+        <option value="4B">4B</option>
+        <option value="4C">4C</option>
+        <option value="5A">5A</option>
+        <option value="5B">5B</option>
+        <option value="5C">5C</option>
+        <option value="6A">6A</option>
+        <option value="6B">6B</option>
+        <option value="6C">6C</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Maestra(o) Encargado(a):</label>
+      <div id="maestraNombre" class="teacher-box">AURELIA MORALES</div>
+    </div>
+  </div>
+
+  <!-- Barra de Acciones -->
+  <div class="actions-bar">
+    <h2>Listado del Grupo <span id="lblGrupoActual">(3A)</span></h2>
+    <div>
+      <button class="btn btn-primary" onclick="abrirModalAgregar()">➕ Agregar Estudiante</button>
+      <button class="btn btn-success" onclick="guardarAsistencia()">💾 Guardar Asistencia Día</button>
+      <button class="btn btn-warning" onclick="descargarExcelTipificado()">📊 Descargar Excel Tipificado</button>
+    </div>
+  </div>
+
+  <!-- Tabla de Asistencia -->
+  <table>
+    <thead>
+      <tr>
+        <th>N°</th>
+        <th>Nombre del Estudiante</th>
+        <th>Programa Especial</th>
+        <th>Diagnóstico / Atención</th>
+        <th>Condición de Asistencia</th>
+        <th>Total Asis.</th>
+        <th>Total Aus.</th>
+        <th>Total Tard.</th>
+        <th>Registro de Hábitos y Actitudes</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tablaEstudiantes">
+      <!-- Se carga dinámicamente con la data guardada -->
+    </tbody>
+  </table>
+
+  <!-- Seccion Historial Cronologico con Buscador -->
+  <h2>📜 Historial Cronológico de Hábitos y Actitudes</h2>
+
+  <div class="search-box-container">
+    <label for="buscarEstudianteHistorial" style="font-weight: bold; font-size: 0.95rem;">Buscar Estudiante:</label>
+    <input type="text" id="buscarEstudianteHistorial" placeholder="Escriba el nombre del estudiante para filtrar..." onkeypress="evaluarTeclaBuscador(event)">
+    <button class="btn btn-primary" onclick="buscarHistorial()">🔎 Buscar</button>
+    <button class="btn btn-secondary" onclick="limpiarBusquedaHistorial()">🔄 Mostrar Todos</button>
+  </div>
+
+  <!-- Cuadro de Visualizacion del Historial -->
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Grupo</th>
+        <th>Estudiante</th>
+        <th>Observación / Seguimiento Psicopedagógico</th>
+      </tr>
+    </thead>
+    <tbody id="tablaHistorial">
+      <!-- Se llena dinámicamente según el filtro o lista completa -->
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal Formulario Agregar / Editar Estudiante -->
+<div id="studentModal" class="modal">
+  <div class="modal-content">
+    <h3 id="modalTitle">Agregar Estudiante</h3>
+    <input type="hidden" id="editIndex">
+    <div class="form-group" style="margin-bottom: 10px;">
+      <label>Nombre Completo:</label>
+      <input type="text" id="inputNombre" placeholder="Ej: ATENCIO, JOSUÉ J.">
+    </div>
+    <div class="form-group" style="margin-bottom: 10px;">
+      <label>Programa Especial:</label>
+      <select id="inputPrograma">
+        <option value="NINGUNO">Ninguno</option>
+        <option value="IPHE">IPHE (Celeste - Agnes)</option>
+        <option value="DIFA">DIFA (Amarillo - Darisbeth)</option>
+        <option value="EDUC. ESPECIAL">EDUC. ESPECIAL (Rosado - Thais Moreno)</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom: 15px;">
+      <label>Diagnóstico / Observación Específica:</label>
+      <textarea id="inputDiagnostico" rows="3" placeholder="Escriba la observación o diagnóstico aquí..."></textarea>
+    </div>
+    <div style="text-align: right;">
+      <button class="btn btn-danger" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-success" onclick="guardarEstudiante()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Docentes asignados por grupo desde el Excel
+  const docentes = {
+    '3A': 'AURELIA MORALES', '3B': 'IRIS FERNANDEZ', '3C': 'MABELYN ORTIZ',
+    '4A': 'LISANDRO BLANFORD', '4B': 'SECUNDINA SANCHEZ', '4C': 'ILKA CORRALES',
+    '5A': 'ELIZEL DUARTE', '5B': 'LYDA THOMAS', '5C': 'ALICIA ROOK',
+    '6A': 'YIMENA SAMUDIO', '6B': 'YENISE JUAREZ', '6C': 'NAIRA RECORD'
+  };
+
+  // Base de datos de estudiantes guardados por grupo
+  let estudiantesData = {
+    '3A': [
+      { id: 1, nombre: "ATENCIO, JOSUÉ J.", programa: "IPHE", diagnostico: "Atención por especialista AGNES (CELESTE)", asistencias: {}, ausencias: 0, tardanzas: 0, totalAsistencias: 0 },
+      { id: 2, nombre: "BEITIA M., OMAR N.", programa: "DIFA", diagnostico: "Atención por especialista DARISBETH (AMARILLO)", asistencias: {}, ausencias: 0, tardanzas: 0, totalAsistencias: 0 },
+      { id: 3, nombre: "BINNS S., VICTORIA I.", programa: "EDUC. ESPECIAL", diagnostico: "Atención por especialista THAIS MORENO (ROSADO)", asistencias: {}, ausencias: 0, tardanzas: 0, totalAsistencias: 0 },
+      { id: 4, nombre: "CALLENDER H., TREYSIE N.", programa: "NINGUNO", diagnostico: "", asistencias: {}, ausencias: 0, tardanzas: 0, totalAsistencias: 0 }
+    ],
+    '3B': [
+      { id: 1, nombre: "ABREGO S., EYTIN R.", programa: "NINGUNO", diagnostico: "", asistencias: {}, ausencias: 0, tardanzas: 0, totalAsistencias: 0 },
+      { id: 2, nombre: "ARAUZ G., JEICOB R.", programa: "NINGUNO", diagnostico: "", asistencias: {}, ausencias: 0, tardanzas: 0, totalAsistencias: 0 }
+    ]
+  };
+
+  let fechasRegistradas = { '3A': [] };
+  let historialHabitos = [];
+
+  // Configurar la fecha de hoy por defecto
+  document.getElementById('fechaSelect').value = new Date().toISOString().split('T')[0];
+
+  function cargarGrupo() {
+    const grupo = document.getElementById('grupoSelect').value;
+    document.getElementById('maestraNombre').innerText = docentes[grupo] || 'NO ASIGNADO';
+    document.getElementById('lblGrupoActual').innerText = `(${grupo})`;
+
+    if (!estudiantesData[grupo]) {
+      estudiantesData[grupo] = [];
+    }
+    if (!fechasRegistradas[grupo]) {
+      fechasRegistradas[grupo] = [];
+    }
+
+    renderTabla();
+  }
+
+  function renderTabla() {
+    const grupo = document.getElementById('grupoSelect').value;
+    const fecha = document.getElementById('fechaSelect').value;
+    const tbody = document.getElementById('tablaEstudiantes');
+    tbody.innerHTML = '';
+
+    estudiantesData[grupo].forEach((est, index) => {
+      let badgeClass = '';
+      if (est.programa === 'IPHE') badgeClass = 'badge-iphe';
+      else if (est.programa === 'DIFA') badgeClass = 'badge-difa';
+      else if (est.programa === 'EDUC. ESPECIAL') badgeClass = 'badge-esp';
+
+      const estadoHoy = est.asistencias[fecha] || 'A';
+
+      tbody.innerHTML += `
+        <tr>
+          <td>${index + 1}</td>
+          <td><strong>${est.nombre}</strong></td>
+          <td>${est.programa !== 'NINGUNO' ? `<span class="${badgeClass}">${est.programa}</span>` : 'N/A'}</td>
+          <td><small>${est.diagnostico || '-'}</small></td>
+          <td>
+            <select id="asistencia_${index}">
+              <option value="A" ${estadoHoy === 'A' ? 'selected' : ''}>A - Asistencia</option>
+              <option value="Aus" ${estadoHoy === 'Aus' ? 'selected' : ''}>Aus - Ausencia</option>
+              <option value="T" ${estadoHoy === 'T' ? 'selected' : ''}>T - Tardanza</option>
+              <option value="E" ${estadoHoy === 'E' ? 'selected' : ''}>E - Enfermedad</option>
+              <option value="T1" ${estadoHoy === 'T1' ? 'selected' : ''}>T1 - Traslado 1</option>
+              <option value="T2" ${estadoHoy === 'T2' ? 'selected' : ''}>T2 - Traslado 2</option>
+            </select>
+          </td>
+          <td><strong style="color: #16a34a;">${est.totalAsistencias}</strong></td>
+          <td><strong style="color: #dc2626;">${est.ausencias}</strong></td>
+          <td><strong style="color: #ca8a04;">${est.tardanzas}</strong></td>
+          <td>
+            <input type="text" id="habito_${index}" placeholder="Anotación de hábitos..." style="width: 90%;">
+          </td>
+          <td>
+            <button class="btn btn-warning btn-sm" onclick="abrirModalEditar(${index})">✏️ Editar</button>
+            <button class="btn btn-danger btn-sm" onclick="eliminarEstudiante(${index})">🗑️</button>
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  function guardarAsistencia() {
+    const grupo = document.getElementById('grupoSelect').value;
+    const fecha = document.getElementById('fechaSelect').value;
+
+    if (!fechasRegistradas[grupo].includes(fecha)) {
+      fechasRegistradas[grupo].push(fecha);
+      fechasRegistradas[grupo].sort();
+    }
+
+    estudiantesData[grupo].forEach((est, index) => {
+      const estado = document.getElementById(`asistencia_${index}`).value;
+      const habitoText = document.getElementById(`habito_${index}`).value.trim();
+
+      est.asistencias[fecha] = estado;
+
+      let totalAsis = 0;
+      let totalAus = 0;
+      let totalTard = 0;
+
+      Object.values(est.asistencias).forEach(val => {
+        if (val === 'A' || val === 'T1' || val === 'T2') totalAsis++;
+        if (val === 'Aus' || val === 'E') totalAus++;
+        if (val === 'T') totalTard++;
+      });
+
+      est.totalAsistencias = totalAsis;
+      est.ausencias = totalAus;
+      est.tardanzas = totalTard;
+
+      if (habitoText !== "") {
+        historialHabitos.push({
+          fecha: fecha,
+          grupo: grupo,
+          estudiante: est.nombre,
+          observacion: habitoText
+        });
+      }
+    });
+
+    renderTabla();
+    renderHistorial();
+    alert(`¡Asistencia del día ${fecha} guardada correctamente para el grupo ${grupo}!`);
+  }
+
+  /* NUEVO: BUSCADOR Y RENDERIZADO DEL HISTORIAL DE HÁBITOS */
+  function renderHistorial(filtrado = null) {
+    const tbody = document.getElementById('tablaHistorial');
+    tbody.innerHTML = '';
+
+    const registrosAMostrar = filtrado !== null ? filtrado : historialHabitos;
+
+    if (registrosAMostrar.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No se encontraron registros de hábitos u observaciones para la búsqueda.</td></tr>`;
+      return;
+    }
+
+    registrosAMostrar.forEach(h => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${h.fecha}</td>
+          <td><strong>${h.grupo}</strong></td>
+          <td><strong>${h.estudiante}</strong></td>
+          <td>${h.observacion}</td>
+        </tr>
+      `;
+    });
+  }
+
+  function buscarHistorial() {
+    const texto = document.getElementById('buscarEstudianteHistorial').value.trim().toLowerCase();
+    
+    if (texto === "") {
+      renderHistorial();
+      return;
+    }
+
+    const resultado = historialHabitos.filter(h => 
+      h.estudiante.toLowerCase().includes(texto) ||
+      h.grupo.toLowerCase().includes(texto)
+    );
+
+    renderHistorial(resultado);
+  }
+
+  function limpiarBusquedaHistorial() {
+    document.getElementById('buscarEstudianteHistorial').value = '';
+    renderHistorial();
+  }
+
+  function evaluarTeclaBuscador(event) {
+    if (event.key === 'Enter') {
+      buscarHistorial();
+    }
+  }
+
+  /* EXPORTACIÓN A EXCEL TIPIFICADO */
+  function descargarExcelTipificado() {
+    const grupo = document.getElementById('grupoSelect').value;
+    const trimestre = document.getElementById('trimestreSelect').value;
+    const maestra = docentes[grupo] || 'NO ASIGNADO';
+    const listaFechas = fechasRegistradas[grupo] || [];
+
+    if (listaFechas.length === 0) {
+      alert("Aún no has guardado ninguna asistencia para este grupo. Guarda al menos un día antes de descargar el reporte.");
+      return;
+    }
+
+    let dataExcel = [];
+    dataExcel.push(["MAESTRA(O):", maestra, "", "GRUPO:", grupo, "", "PERIODO:", trimestre]);
+    dataExcel.push([]); 
+
+    let encabezado = ["N°", "Nombre del Estudiante", "Programa Especial", "Diagnóstico / Atención"];
+    listaFechas.forEach(fecha => {
+      encabezado.push(`Fecha: ${fecha}`);
+    });
+
+    encabezado.push("Total Asistencias");
+    encabezado.push("Total Ausencias");
+    encabezado.push("Total Tardanzas");
+
+    dataExcel.push(encabezado);
+
+    estudiantesData[grupo].forEach((est, idx) => {
+      let fila = [
+        idx + 1,
+        est.nombre,
+        est.programa !== 'NINGUNO' ? est.programa : '',
+        est.diagnostico || ''
+      ];
+
+      listaFechas.forEach(fecha => {
+        fila.push(est.asistencias[fecha] || '-');
+      });
+
+      fila.push(est.totalAsistencias);
+      fila.push(est.ausencias);
+      fila.push(est.tardanzas);
+
+      dataExcel.push(fila);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(dataExcel);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `Asistencia_${grupo}`);
+
+    XLSX.writeFile(wb, `Reporte_Asistencia_Grupo_${grupo}_${trimestre}.xlsx`);
+  }
+
+  /* MODAL Y ACCIONES SECUNDARIAS */
+  function abrirModalAgregar() {
+    document.getElementById('modalTitle').innerText = 'Agregar Estudiante';
+    document.getElementById('editIndex').value = '-1';
+    document.getElementById('inputNombre').value = '';
+    document.getElementById('inputPrograma').value = 'NINGUNO';
+    document.getElementById('inputDiagnostico').value = '';
+    document.getElementById('studentModal').style.display = 'flex';
+  }
+
+  function abrirModalEditar(index) {
+    const grupo = document.getElementById('grupoSelect').value;
+    const est = estudiantesData[grupo][index];
+
+    document.getElementById('modalTitle').innerText = 'Editar Estudiante';
+    document.getElementById('editIndex').value = index;
+    document.getElementById('inputNombre').value = est.nombre;
+    document.getElementById('inputPrograma').value = est.programa;
+    document.getElementById('inputDiagnostico').value = est.diagnostico;
+    document.getElementById('studentModal').style.display = 'flex';
+  }
+
+  function cerrarModal() {
+    document.getElementById('studentModal').style.display = 'none';
+  }
+
+  function guardarEstudiante() {
+    const grupo = document.getElementById('grupoSelect').value;
+    const editIndex = parseInt(document.getElementById('editIndex').value);
+    const nombre = document.getElementById('inputNombre').value.trim();
+    const programa = document.getElementById('inputPrograma').value;
+    const diagnostico = document.getElementById('inputDiagnostico').value.trim();
+
+    if (!nombre) {
+      alert('Por favor ingrese el nombre del estudiante');
+      return;
+    }
+
+    if (editIndex === -1) {
+      estudiantesData[grupo].push({
+        id: Date.now(),
+        nombre: nombre,
+        programa: programa,
+        diagnostico: diagnostico,
+        asistencias: {},
+        ausencias: 0,
+        tardanzas: 0,
+        totalAsistencias: 0
+      });
+    } else {
+      estudiantesData[grupo][editIndex].nombre = nombre;
+      estudiantesData[grupo][editIndex].programa = programa;
+      estudiantesData[grupo][editIndex].diagnostico = diagnostico;
+    }
+
+    cerrarModal();
+    renderTabla();
+  }
+
+  function eliminarEstudiante(index) {
+    if (confirm('¿Desea eliminar a este estudiante del listado?')) {
+      const grupo = document.getElementById('grupoSelect').value;
+      estudiantesData[grupo].splice(index, 1);
+      renderTabla();
+    }
+  }
+
+  // Carga inicial
+  cargarGrupo();
+</script>
+
+</body>
+</html>
