@@ -24,7 +24,7 @@
     }
 
     .container {
-      max-width: 1250px;
+      max-width: 1300px;
       margin: 0 auto;
       background: white;
       padding: 25px;
@@ -73,6 +73,19 @@
       font-weight: bold;
       color: #1e293b;
     }
+
+    /* Indicador de estado de la Nube */
+    .status-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .status-loading { background-color: #fef08a; color: #854d0e; }
+    .status-online { background-color: #bbf7d0; color: #166534; }
+    .status-error { background-color: #fecaca; color: #991b1b; }
 
     /* Tabla de Estudiantes y Registros */
     table {
@@ -155,7 +168,7 @@
       margin-bottom: 15px;
     }
 
-    /* Estilo para la barra de búsqueda de historial */
+    /* Buscador del Historial */
     .search-box-container {
       display: flex;
       gap: 10px;
@@ -194,7 +207,9 @@
 <body>
 
 <div class="container">
-  <h1>📋 Registro de Asistencia y Hábitos - II Trimestre</h1>
+  <h1>📋 Registro de Asistencia y Hábitos - II Trimestre 
+    <span id="cloudStatus" class="status-badge status-loading">☁️ Conectando Nube...</span>
+  </h1>
 
   <!-- Encabezado de Selección -->
   <div class="header-grid">
@@ -238,7 +253,7 @@
     <h2>Listado del Grupo <span id="lblGrupoActual">(3A)</span></h2>
     <div>
       <button class="btn btn-primary" onclick="abrirModalAgregar()">➕ Agregar Estudiante</button>
-      <button class="btn btn-success" onclick="guardarAsistencia()">💾 Guardar Asistencia Día</button>
+      <button class="btn btn-success" id="btnGuardar" onclick="guardarAsistencia()">💾 Guardar Asistencia Día</button>
       <button class="btn btn-warning" onclick="descargarExcelTipificado()">📊 Descargar Excel Tipificado</button>
     </div>
   </div>
@@ -260,11 +275,11 @@
       </tr>
     </thead>
     <tbody id="tablaEstudiantes">
-      <!-- Se carga dinámicamente con la data guardada -->
+      <!-- Carga dinámicamente -->
     </tbody>
   </table>
 
-  <!-- Seccion Historial Cronologico con Buscador -->
+  <!-- Sección Historial Cronológico con Buscador -->
   <h2>📜 Historial Cronológico de Hábitos y Actitudes</h2>
 
   <div class="search-box-container">
@@ -274,7 +289,7 @@
     <button class="btn btn-secondary" onclick="limpiarBusquedaHistorial()">🔄 Mostrar Todos</button>
   </div>
 
-  <!-- Cuadro de Visualizacion del Historial -->
+  <!-- Cuadro de Visualización del Historial -->
   <table>
     <thead>
       <tr>
@@ -285,7 +300,7 @@
       </tr>
     </thead>
     <tbody id="tablaHistorial">
-      <!-- Se llena dinámicamente según el filtro o lista completa -->
+      <!-- Carga dinámicamente -->
     </tbody>
   </table>
 </div>
@@ -320,7 +335,10 @@
 </div>
 
 <script>
-  // Docentes asignados por grupo desde el Excel
+  // URL configurada de tu Google Apps Script
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw78XRNqxs1_iLkdJz5itYoxnaqKD3FLgoCXkfXsfX2u18efAy4tWLFiLPTSnzNWORh5Q/exec";
+
+  // Docentes asignados por grupo
   const docentes = {
     '3A': 'AURELIA MORALES', '3B': 'IRIS FERNANDEZ', '3C': 'MABELYN ORTIZ',
     '4A': 'LISANDRO BLANFORD', '4B': 'SECUNDINA SANCHEZ', '4C': 'ILKA CORRALES',
@@ -328,7 +346,7 @@
     '6A': 'YIMENA SAMUDIO', '6B': 'YENISE JUAREZ', '6C': 'NAIRA RECORD'
   };
 
-  // Base de datos de estudiantes guardados por grupo
+  // Base de datos local precargada con los datos del Excel
   let estudiantesData = {
     '3A': [
       { id: 1, nombre: "ATENCIO, JOSUÉ J.", programa: "IPHE", diagnostico: "Atención por especialista AGNES (CELESTE)", asistencias: {}, ausencias: 0, tardanzas: 0, totalAsistencias: 0 },
@@ -345,20 +363,95 @@
   let fechasRegistradas = { '3A': [] };
   let historialHabitos = [];
 
-  // Configurar la fecha de hoy por defecto
   document.getElementById('fechaSelect').value = new Date().toISOString().split('T')[0];
+
+  // ☁️ Sincronizar con Google Sheets al Iniciar
+  async function cargarDatosDesdeNube() {
+    const badge = document.getElementById('cloudStatus');
+    try {
+      badge.className = "status-badge status-loading";
+      badge.innerText = "☁️ Cargando datos de la Nube...";
+
+      const resp = await fetch(APPS_SCRIPT_URL);
+      const data = await resp.json();
+
+      // Procesar Asistencias de la Nube
+      if (data.asistencia && data.asistencia.length > 1) {
+        for (let i = 1; i < data.asistencia.length; i++) {
+          const [grp, fch, estNom, cond] = data.asistencia[i];
+          if (!grp || !fch || !estNom) continue;
+
+          const fechaStr = new Date(fch).toISOString().split('T')[0];
+
+          if (!fechasRegistradas[grp]) fechasRegistradas[grp] = [];
+          if (!fechasRegistradas[grp].includes(fechaStr)) {
+            fechasRegistradas[grp].push(fechaStr);
+            fechasRegistradas[grp].sort();
+          }
+
+          if (estudiantesData[grp]) {
+            const estObj = estudiantesData[grp].find(e => e.nombre.trim() === estNom.trim());
+            if (estObj) {
+              estObj.asistencias[fechaStr] = cond;
+            }
+          }
+        }
+      }
+
+      recalcularTotales();
+
+      // Procesar Hábitos de la Nube
+      if (data.habitos && data.habitos.length > 1) {
+        historialHabitos = [];
+        for (let i = 1; i < data.habitos.length; i++) {
+          const [fch, grp, estNom, obs] = data.habitos[i];
+          if (fch && estNom && obs) {
+            const fechaStr = new Date(fch).toISOString().split('T')[0];
+            historialHabitos.push({
+              fecha: fechaStr,
+              grupo: grp,
+              estudiante: estNom,
+              observacion: obs
+            });
+          }
+        }
+      }
+
+      badge.className = "status-badge status-online";
+      badge.innerText = "☁️ Nube Sincronizada";
+      cargarGrupo();
+      renderHistorial();
+
+    } catch (err) {
+      console.error(err);
+      badge.className = "status-badge status-error";
+      badge.innerText = "⚠️ Error conectando a la Nube";
+    }
+  }
+
+  function recalcularTotales() {
+    Object.keys(estudiantesData).forEach(grp => {
+      estudiantesData[grp].forEach(est => {
+        let totalAsis = 0, totalAus = 0, totalTard = 0;
+        Object.values(est.asistencias).forEach(val => {
+          if (val === 'A' || val === 'T1' || val === 'T2' || val === 'AE') totalAsis++;
+          if (val === 'Aus' || val === 'E') totalAus++;
+          if (val === 'T') totalTard++;
+        });
+        est.totalAsistencias = totalAsis;
+        est.ausencias = totalAus;
+        est.tardanzas = totalTard;
+      });
+    });
+  }
 
   function cargarGrupo() {
     const grupo = document.getElementById('grupoSelect').value;
     document.getElementById('maestraNombre').innerText = docentes[grupo] || 'NO ASIGNADO';
     document.getElementById('lblGrupoActual').innerText = `(${grupo})`;
 
-    if (!estudiantesData[grupo]) {
-      estudiantesData[grupo] = [];
-    }
-    if (!fechasRegistradas[grupo]) {
-      fechasRegistradas[grupo] = [];
-    }
+    if (!estudiantesData[grupo]) estudiantesData[grupo] = [];
+    if (!fechasRegistradas[grupo]) fechasRegistradas[grupo] = [];
 
     renderTabla();
   }
@@ -391,6 +484,8 @@
               <option value="E" ${estadoHoy === 'E' ? 'selected' : ''}>E - Enfermedad</option>
               <option value="T1" ${estadoHoy === 'T1' ? 'selected' : ''}>T1 - Traslado 1</option>
               <option value="T2" ${estadoHoy === 'T2' ? 'selected' : ''}>T2 - Traslado 2</option>
+              <option value="AE" ${estadoHoy === 'AE' ? 'selected' : ''}>AE - Actividad de Escuela</option>
+              <option value="O" ${estadoHoy === 'O' ? 'selected' : ''}>O - Otros</option>
             </select>
           </td>
           <td><strong style="color: #16a34a;">${est.totalAsistencias}</strong></td>
@@ -408,14 +503,19 @@
     });
   }
 
-  function guardarAsistencia() {
+  // 💾 Guardar Asistencia y Enviar a Google Sheets
+  async function guardarAsistencia() {
     const grupo = document.getElementById('grupoSelect').value;
     const fecha = document.getElementById('fechaSelect').value;
+    const btn = document.getElementById('btnGuardar');
 
     if (!fechasRegistradas[grupo].includes(fecha)) {
       fechasRegistradas[grupo].push(fecha);
       fechasRegistradas[grupo].sort();
     }
+
+    let nuevosRegistros = [];
+    let nuevosHabitos = [];
 
     estudiantesData[grupo].forEach((est, index) => {
       const estado = document.getElementById(`asistencia_${index}`).value;
@@ -423,36 +523,54 @@
 
       est.asistencias[fecha] = estado;
 
-      let totalAsis = 0;
-      let totalAus = 0;
-      let totalTard = 0;
-
-      Object.values(est.asistencias).forEach(val => {
-        if (val === 'A' || val === 'T1' || val === 'T2') totalAsis++;
-        if (val === 'Aus' || val === 'E') totalAus++;
-        if (val === 'T') totalTard++;
+      nuevosRegistros.push({
+        grupo: grupo,
+        fecha: fecha,
+        estudiante: est.nombre,
+        condicion: estado
       });
 
-      est.totalAsistencias = totalAsis;
-      est.ausencias = totalAus;
-      est.tardanzas = totalTard;
-
       if (habitoText !== "") {
-        historialHabitos.push({
+        const itemHab = {
           fecha: fecha,
           grupo: grupo,
           estudiante: est.nombre,
           observacion: habitoText
-        });
+        };
+        historialHabitos.push(itemHab);
+        nuevosHabitos.push(itemHab);
       }
     });
 
+    recalcularTotales();
     renderTabla();
     renderHistorial();
-    alert(`¡Asistencia del día ${fecha} guardada correctamente para el grupo ${grupo}!`);
+
+    try {
+      btn.disabled = true;
+      btn.innerText = "⏳ Guardando en Nube...";
+
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: "SAVE_ATTENDANCE",
+          records: nuevosRegistros,
+          habits: nuevosHabitos
+        })
+      });
+
+      alert(`¡Asistencia del día ${fecha} guardada y sincronizada en la nube!`);
+    } catch (e) {
+      console.error(e);
+      alert("Guardado localmente. Hubo un problema al enviar los datos a Google Sheets.");
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "💾 Guardar Asistencia Día";
+    }
   }
 
-  /* NUEVO: BUSCADOR Y RENDERIZADO DEL HISTORIAL DE HÁBITOS */
   function renderHistorial(filtrado = null) {
     const tbody = document.getElementById('tablaHistorial');
     tbody.innerHTML = '';
@@ -460,7 +578,7 @@
     const registrosAMostrar = filtrado !== null ? filtrado : historialHabitos;
 
     if (registrosAMostrar.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No se encontraron registros de hábitos u observaciones para la búsqueda.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b;">No se encontraron registros de hábitos u observaciones.</td></tr>`;
       return;
     }
 
@@ -478,17 +596,14 @@
 
   function buscarHistorial() {
     const texto = document.getElementById('buscarEstudianteHistorial').value.trim().toLowerCase();
-    
     if (texto === "") {
       renderHistorial();
       return;
     }
-
     const resultado = historialHabitos.filter(h => 
       h.estudiante.toLowerCase().includes(texto) ||
       h.grupo.toLowerCase().includes(texto)
     );
-
     renderHistorial(resultado);
   }
 
@@ -498,12 +613,10 @@
   }
 
   function evaluarTeclaBuscador(event) {
-    if (event.key === 'Enter') {
-      buscarHistorial();
-    }
+    if (event.key === 'Enter') buscarHistorial();
   }
 
-  /* EXPORTACIÓN A EXCEL TIPIFICADO */
+  /* EXPORTACIÓN EXCEL */
   function descargarExcelTipificado() {
     const grupo = document.getElementById('grupoSelect').value;
     const trimestre = document.getElementById('trimestreSelect').value;
@@ -511,7 +624,7 @@
     const listaFechas = fechasRegistradas[grupo] || [];
 
     if (listaFechas.length === 0) {
-      alert("Aún no has guardado ninguna asistencia para este grupo. Guarda al menos un día antes de descargar el reporte.");
+      alert("Aún no has guardado ninguna asistencia para este grupo.");
       return;
     }
 
@@ -520,9 +633,7 @@
     dataExcel.push([]); 
 
     let encabezado = ["N°", "Nombre del Estudiante", "Programa Especial", "Diagnóstico / Atención"];
-    listaFechas.forEach(fecha => {
-      encabezado.push(`Fecha: ${fecha}`);
-    });
+    listaFechas.forEach(fecha => encabezado.push(`Fecha: ${fecha}`));
 
     encabezado.push("Total Asistencias");
     encabezado.push("Total Ausencias");
@@ -556,7 +667,7 @@
     XLSX.writeFile(wb, `Reporte_Asistencia_Grupo_${grupo}_${trimestre}.xlsx`);
   }
 
-  /* MODAL Y ACCIONES SECUNDARIAS */
+  /* MODAL */
   function abrirModalAgregar() {
     document.getElementById('modalTitle').innerText = 'Agregar Estudiante';
     document.getElementById('editIndex').value = '-1';
@@ -623,8 +734,8 @@
     }
   }
 
-  // Carga inicial
-  cargarGrupo();
+  // Carga inicial sincronizada con la nube
+  cargarDatosDesdeNube();
 </script>
 
 </body>
